@@ -1,0 +1,33 @@
+\section*{Описание программы}
+
+\textbf{Архитектура программы:}
+\begin{verbatim}
+lab2/
+├── build/
+├── include/
+│   ├── exceptions.h
+│   └── threads.h
+├── src/
+│   └── threads.cpp
+└── main.cpp
+\end{verbatim}
+
+\textbf{Основные компоненты:}
+
+\begin{itemize}
+    \item \texttt{main.cpp} --- основная программа, реализующая метод Монте-Карло для вычисления площади окружности.
+    \item \texttt{include/exceptions.h} --- объявление классов исключений.
+    \item \texttt{include/threads.h} --- объявление класса Thread для работы с потоками.
+    \item \texttt{src/threads.cpp} --- реализация методов класса Thread.
+\end{itemize}
+
+\textbf{Основные функции и структуры:}
+
+\begin{itemize}
+    \item \texttt{struct GlobalResult} --- хранит общие данные для всех потоков (общее количество попаданий и мьютекс для синхронизации).
+    \item \texttt{struct ThreadArgs} --- аргументы, передаваемые в каждый поток (радиус, количество точек для генерации, указатель на глобальные данные).
+    \item \texttt{void* calculate\_area\_chunk(void* args)} --- функция, выполняемая в каждом потоке. Генерирует случайные точки и подсчитывает попадания внутрь окружности.
+    \item \texttt{int main(int argc, char* argv[])} --- точка входа в программу, управляет созданием и синхронизацией потоков.
+\end{itemize}
+
+Программа использует мьютекс (\texttt{pthread\_mutex\_t}) для синхронизации доступа к общему счетчику, что предотвращает гонки данных при одновременной записи от нескольких потоков.
