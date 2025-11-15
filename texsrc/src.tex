@@ -1,0 +1,132 @@
+\section{Метод решения}
+
+Алгоритм решения задачи:
+
+\begin{enumerate}
+    \item Пользователь в консоль родительского процесса вводит имя файла, которое будет использовано для открытия файла дочерним процессом.
+    
+    \item Создается объект класса Parent (родительский процесс).
+    
+    \item Родительский процесс создает канал (pipe) для передачи данных между родительским и дочерним процессами. Затем делает fork для создания дочернего процесса.
+    
+    \item Дочерний процесс закрывает соответствующий канал для записи, перенаправляет конец канала для чтения на стандартный ввод, закрывает второй конец канала.
+    
+    \item Дочерний процесс пытается запустить бинарный файл для дочернего процесса, если не получилось — завершается.
+    
+    \item Родительский процесс закрывает конец канала для чтения и отправляет имя файла для его открытия дочернему процессу.
+    
+    \item Дочерний процесс пытается открыть указанный файл, если не получилось — процесс завершается.
+    
+    \item Родительский процесс считывает пользовательский ввод и отправляет дочернему процессу через pipe.
+    
+    \item Дочерний процесс читает строки чисел, производит деление первого числа на последующие, а результат выводит в файл.
+    
+    \item Если происходит деление на 0, то дочерний процесс завершает свою работу с ошибкой, после чего родительский процесс также завершает работу.
+    
+    \item По команде "exit" родитель останавливает дочерний процесс и программа завершается.
+\end{enumerate}
+
+\section{Архитектура программы}
+
+\subsection{Структура проекта}
+
+\begin{verbatim}
+lab1_os
+|-- app
+|   |-- childmain.cpp
+|   |-- parentmain.cpp
+|-- include
+|   |-- child.h
+|   |-- os.h
+|   |-- parent.h
+|-- src
+|   |-- child.cpp
+|   |-- oswin.cpp
+|   |-- os.cpp
+|   |-- parent.cpp
+|-- main.tex
+\end{verbatim}
+
+\subsection{Назначение файлов}
+
+\begin{itemize}
+    \item \textbf{app/childmain.cpp} — точка входа в программу для дочернего процесса
+    \item \textbf{app/parentmain.cpp} — точка входа в программу для родительского процесса
+    \item \textbf{include/child.h} — объявление класса Child
+    \item \textbf{include/parent.h} — объявление класса Parent
+    \item \textbf{include/os.h} — объявление функций управления процессами ОС
+    \item \textbf{src/child.cpp} — реализация класса Child
+    \item \textbf{src/parent.cpp} — реализация класса Parent
+    \item \textbf{src/oswin.cpp} — реализация функций для работы с процессами и каналами в Windows
+    \item \textbf{src/os.cpp} — реализация функций для работы с процессами и каналами в Linux
+\end{itemize}
+
+\section{Описание программы}
+
+\subsection*{Класс Child}
+
+\subsubsection*{Поля класса}
+\begin{itemize}
+    \item \texttt{std::string filename} — название файла для открытия
+    \item \texttt{FILE* file} — указатель на файл для записи
+\end{itemize}
+
+\subsubsection*{Основные методы}
+\begin{itemize}
+    \item \texttt{Child(const std::string\& filename\_arg)} — конструктор, открывающий файл
+    \item \texttt{void ProcessDivision()} — получает из канала строки, выполняет деление и записывает в файл
+    \item \texttt{\texttildelow Child()} — деструктор, закрывающий файл
+\end{itemize}
+
+\subsubsection*{Вспомогательные методы}
+\begin{itemize}
+    \item \texttt{std::vector<int> parse\_numbers(const std::string\& input\_line)} — парсит строку с числами
+\end{itemize}
+
+\subsection*{Класс Parent}
+
+\subsubsection*{Поля класса}
+\begin{itemize}
+    \item \texttt{int pipe\_write\_end} — конец канала для записи в дочерний процесс
+    \item \texttt{int pipe\_read\_end} — конец канала для чтения
+\end{itemize}
+
+\subsubsection*{Основные методы}
+\begin{itemize}
+    \item \texttt{Parent()} — конструктор
+    \item \texttt{void CreateChildProcess(const std::string\& filename)} — создает дочерний процесс
+    \item \texttt{void Input()} — получает пользовательский ввод и записывает в канал
+    \item \texttt{void EndChild()} — завершает дочерний процесс
+    \item \texttt{\texttildelow Parent()} — деструктор
+\end{itemize}
+
+\subsection*{Модуль OS}
+
+\subsubsection*{Основные функции}
+\begin{itemize}
+    \item \texttt{int CreateChildProcess(const StartProcess\& args)} — создает дочерний процесс
+    \item \texttt{bool CreatePipe(PipeHandle\& readpipe, PipeHandle\& writepipe)} — создает канал
+    \item \texttt{int WritePipe(PipeHandle pipe, const void* buf, int count)} — запись в канал
+    \item \texttt{int ReadPipe(PipeHandle pipe, void* buf, int count)} — чтение из канала
+    \item \texttt{void ClosePipe(PipeHandle pipe)} — закрытие канала
+    \item \texttt{void Exit(int code)} — завершение текущего процесса
+    \item \texttt{int WaitForChild()} — ожидание завершения дочернего процесса
+\end{itemize}
+
+\section{Результаты}
+
+Программа получает на вход название файла, создает дочерний процесс, который открывает этот файл. Далее все введенные пользователем строки с числами передаются в дочерний процесс, который выполняет деление первого числа на последующие и записывает результаты в файл.
+
+\subsection{Пример работы программы}
+
+\begin{verbatim}
+Входные данные: "10 2 5"
+Результат в файле: 
+10 / 2 = 5
+10 / 5 = 2
+
+Входные данные: "100 4 25"
+Результат в файле:
+100 / 4 = 25
+100 / 25 = 4
+\end{verbatim}
