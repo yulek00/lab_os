@@ -1,0 +1,201 @@
+\section*{Описание программы}
+
+\texttt{functions.h} — объявляет функции с \texttt{extern "C"} для экспорта без name mangling.
+
+\texttt{gcf\_euclid.cpp} — реализует НОД через рекурсивный алгоритм Евклида.
+
+\texttt{gcf\_naive.cpp} — реализует НОД перебором делителей от 1 до $\min(A, B)$.
+
+\texttt{square\_rect.cpp} — возвращает площадь прямоугольника: $A \cdot B$.
+
+\texttt{square\_triangle.cpp} — возвращает площадь прямоугольного треугольника: $0.5 \cdot A \cdot B$.
+
+\texttt{main\_static.cpp} — программа №1, использует статическую линковку, поддерживает команды \texttt{0}, \texttt{1}, \texttt{2}.
+
+\texttt{main\_dynamic.cpp} — программа №2, загружает библиотеки вручную, поддерживает команды \texttt{0} (выход), \texttt{1}, \texttt{2}, \texttt{3} (переключение реализации).
+
+Все программы скомпилированы с флагом \texttt{C++17}, используют \texttt{dlopen/dlsym/dlclose} из \texttt{<dlfcn.h>}.
+
+\section*{Исходный код}
+
+\begin{lstlisting}[language=C++]
+#pragma once
+
+extern "C" {
+    int GCF(int A, int B);
+    float Square(float A, float B);
+}
+\end{lstlisting}
+Листинг 1: include/functions.h
+
+\begin{lstlisting}[language=C++]
+#include "functions.h"
+
+extern "C" {
+    int GCF(int A, int B) {
+        if (B == 0)
+            return A;
+        return GCF(B, A % B);
+    }
+}
+\end{lstlisting}
+Листинг 2: src/gcf_euclid.cpp
+
+\begin{lstlisting}[language=C++]
+#include "functions.h"
+#include <algorithm>
+
+extern "C" {
+    int GCF(int A, int B) {
+        int gcd = 1;
+        int limit = std::min(A, B);
+        for (int i = 1; i <= limit; ++i) {
+            if (A % i == 0 && B % i == 0)
+                gcd = i;
+        }
+        return gcd;
+    }
+}
+\end{lstlisting}
+Листинг 3: src/gcf_naive.cpp
+
+\begin{lstlisting}[language=C++]
+#include "functions.h"
+
+extern "C" {
+    float Square(float A, float B) {
+        return A * B;
+    }
+}
+\end{lstlisting}
+Листинг 4: src/square_rect.cpp
+
+\begin{lstlisting}[language=C++]
+#include "functions.h"
+
+extern "C" {
+    float Square(float A, float B) {
+        return 0.5f * A * B;
+    }
+}
+\end{lstlisting}
+Листинг 5: src/square_triangle.cpp
+
+\begin{lstlisting}[language=C++]
+#include <iostream>
+#include "functions.h"
+
+int main() {
+    int cmd;
+    std::cout << "Lab 4: Static Linking (Euclid + Rectangle)\n";
+    std::cout << "0 - Exit\n";
+    std::cout << "1 <A> <B> - GCF\n";
+    std::cout << "2 <A> <B> - Area\n";
+
+    while (std::cin >> cmd) {
+        if (cmd == 0) {
+            std::cout << "Exiting...\n";
+            break;
+        } else if (cmd == 1) {
+            int a, b;
+            std::cin >> a >> b;
+            std::cout << "GCF(" << a << ", " << b << ") = " << GCF(a, b) << "\n";
+        } else if (cmd == 2) {
+            float a, b;
+            std::cin >> a >> b;
+            std::cout << "Area: " << Square(a, b) << "\n";
+        } else {
+            std::cout << "Unknown command.\n";
+        }
+    }
+    return 0;
+}
+\end{lstlisting}
+Листинг 6: main_static.cpp
+
+\begin{lstlisting}[language=C++]
+#include <iostream>
+#include <dlfcn.h>
+#include "functions.h"
+
+using GCF_Func = int (*)(int, int);
+using Square_Func = float (*)(float, float);
+
+const char* LIB_EUCLID = "./libgcf_euclid.so";
+const char* LIB_NAIVE = "./libgcf_naive.so";
+const char* LIB_RECT = "./libsquare_rect.so";
+const char* LIB_TRIANGLE = "./libsquare_triangle.so";
+
+int main() {
+    void* handle_gcf = nullptr;
+    void* handle_square = nullptr;
+
+    GCF_Func CalcGCF = nullptr;
+    Square_Func CalcSquare = nullptr;
+
+    int mode = 0;
+
+    auto load_libs = [&](int current_mode) {
+        if (handle_gcf) dlclose(handle_gcf);
+        if (handle_square) dlclose(handle_square);
+
+        const char* path_gcf = (current_mode == 0) ? LIB_EUCLID : LIB_NAIVE;
+        const char* path_sq = (current_mode == 0) ? LIB_RECT : LIB_TRIANGLE;
+
+        handle_gcf = dlopen(path_gcf, RTLD_LAZY);
+        handle_square = dlopen(path_sq, RTLD_LAZY);
+
+        if (!handle_gcf || !handle_square) {
+            std::cerr << "Error loading libs: " << dlerror() << "\n";
+            exit(EXIT_FAILURE);
+        }
+
+        CalcGCF = (GCF_Func)dlsym(handle_gcf, "GCF");
+        CalcSquare = (Square_Func)dlsym(handle_square, "Square");
+
+        if (!CalcGCF || !CalcSquare) {
+            std::cerr << "Error loading symbols: " << dlerror() << "\n";
+            exit(EXIT_FAILURE);
+        }
+
+        std::cout << "Switched to: "
+                  << ((current_mode == 0) ? "Euclid & Rectangle" : "Naive & Triangle")
+                  << "\n";
+    };
+
+    load_libs(mode);
+
+    int cmd;
+    std::cout << "Lab 4: Dynamic Loading\n";
+    std::cout << "0 - Exit\n";
+    std::cout << "1 <A> <B> - GCF\n";
+    std::cout << "2 <A> <B> - Area\n";
+    std::cout << "3 - Switch implementation\n";
+
+    while (std::cin >> cmd) {
+        if (cmd == 0) {
+            std::cout << "Exiting...\n";
+            break;
+        } else if (cmd == 3) {
+            mode = !mode;
+            load_libs(mode);
+        } else if (cmd == 1) {
+            int a, b;
+            std::cin >> a >> b;
+            std::cout << "GCF Result: " << CalcGCF(a, b) << "\n";
+        } else if (cmd == 2) {
+            float a, b;
+            std::cin >> a >> b;
+            std::cout << "Square Result: " << CalcSquare(a, b) << "\n";
+        } else {
+            std::cout << "Unknown command\n";
+        }
+    }
+
+    if (handle_gcf) dlclose(handle_gcf);
+    if (handle_square) dlclose(handle_square);
+
+    return 0;
+}
+\end{lstlisting}
+Листинг 7: main_dynamic.cpp

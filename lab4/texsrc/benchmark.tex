@@ -1,0 +1,55 @@
+\section*{Результаты}
+
+Программа успешно создаёт четыре динамические библиотеки:
+\begin{itemize}
+    \item \texttt{libgcf\_euclid.so}
+    \item \texttt{libgcf\_naive.so}
+    \item \texttt{libsquare\_rect.so}
+    \item \texttt{libsquare\_triangle.so}
+\end{itemize}
+
+Тестовая программа \texttt{prog\_static} корректно использует библиотеки, подключённые на этапе линковки.
+
+Программа \texttt{prog\_dynamic} загружает библиотеки во время выполнения, поддерживает переключение реализаций по команде \texttt{3} и корректно вызывает функции через указатели.
+
+Пример сессии:
+
+\begin{verbatim}
+Lab 4: Dynamic Loading
+0 - Exit
+1 <A> <B> - GCF
+2 <A> <B> - Area
+3 - Switch implementation
+1 48 18
+GCF Result: 6
+3
+Switched to: Naive & Triangle
+2 4 5
+Square Result: 10
+0
+Exiting...
+\end{verbatim}
+
+Все команды обрабатываются корректно. Ошибки загрузки библиотек обрабатываются с выводом диагностики.
+
+\section*{Strace}
+
+\begin{lstlisting}[caption=strace вывод программы]
+execve("./prog_dynamic", ["./prog_dynamic"], 0x7ffc7eceb5f0 /* 36 vars */) = 0
+brk(NULL)                               = 0x557cdf291000
+mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f741857e000
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
+openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+fstat(3, {st_mode=S_IFREG|0644, st_size=21863, ...}) = 0
+mmap(NULL, 21863, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f7418578000
+close(3)                                = 0
+...
+openat(AT_FDCWD, "./libgcf_euclid.so", O_RDONLY|O_CLOEXEC) = 3
+...
+openat(AT_FDCWD, "./libgcf_naive.so", O_RDONLY|O_CLOEXEC) = 3
+...
+read(0, "0\n", 1024)                    = 2
+write(1, "Exiting...\n", 11)            = 11
+exit_group(0)                           = ?
++++ exited with 0 +++
+\end{lstlisting}

@@ -1,0 +1,111 @@
+\section*{Условие}
+
+\textbf{Цель работы:}
+\begin{itemize}
+    \item Приобретение практических навыков в:
+    \begin{itemize}
+        \item Создании динамических библиотек;
+        \item Создании программ, использующих функции динамических библиотек.
+    \end{itemize}
+\end{itemize}
+
+\textbf{Задание:}
+
+Требуется создать динамические библиотеки, которые реализуют заданный вариантом функционал. Далее использовать данные библиотеки двумя способами:
+\begin{enumerate}
+    \item Во время компиляции (на этапе «линковки» / linking);
+    \item Во время исполнения программы. Библиотеки загружаются в память с помощью интерфейса ОС для работы с динамическими библиотеками.
+\end{enumerate}
+
+В конечном итоге, в лабораторной работе необходимо получить следующие части:
+\begin{itemize}
+    \item Динамические библиотеки, реализующие контракты, заданные вариантом;
+    \item Тестовая программа (программа №1), которая использует одну из библиотек, используя информацию, полученную на этапе компиляции;
+    \item Тестовая программа (программа №2), которая загружает библиотеки, используя только их относительные пути и контракты.
+\end{itemize}
+
+Провести анализ двух типов использования библиотек. Пользовательский ввод для обеих программ должен быть организован следующим образом:
+\begin{enumerate}
+    \item Если пользователь вводит команду «0», то программа завершает работу. В программе №2 команда «3» переключает реализацию (модификация стандартного требования для удобства интерфейса);
+    \item «1 arg1 arg2 ... argN», где после «1» идут аргументы для первой функции, предусмотренной контрактами;
+    \item «2 arg1 arg2 ... argM», где после «2» идут аргументы для второй функции, предусмотренной контрактами.
+\end{enumerate}
+
+\textbf{Вариант: 24}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{|c|X|X|X|X|}
+\hline
+№ & Описание & Сигнатура & Реализация 1 & Реализация 2 \\
+\hline
+3 & Вычисление наибольшего общего делителя (НОД) для двух натуральных чисел & \texttt{int GCF(int A, int B)} & Алгоритм Евклида & Наивный алгоритм: перебор всех возможных делителей от 1 до $\min(A, B)$ \\
+\hline
+7 & Вычисление площади фигуры по двум параметрам & \texttt{float Square(float A, float B)} & Площадь прямоугольника: $A \cdot B$ & Площадь прямоугольного треугольника: $0.5 \cdot A \cdot B$ \\
+\hline
+\end{tabularx}
+\end{center}
+
+\section*{Метод решения}
+
+Алгоритм решения задачи:
+
+\begin{enumerate}
+    \item Пользователь вводит команду в консоль одной из тестовых программ:
+    \begin{itemize}
+        \item \texttt{0} — выход из программы (в обеих версиях);
+        \item \texttt{3} — переключение реализаций (только для программы №2, \texttt{prog\_dynamic});
+        \item \texttt{1 A B} — вызов функции \texttt{GCF(A, B)};
+        \item \texttt{2 A B} — вызов функции \texttt{Square(A, B)}.
+    \end{itemize}
+
+    \item Для программы \texttt{prog\_static}:
+    \begin{itemize}
+        \item Связывание с библиотеками \texttt{libgcf\_euclid.so} и \texttt{libsquare\_rect.so} происходит на этапе линковки;
+        \item При запуске ОС автоматически загружает указанные \texttt{.so}-файлы;
+        \item Вызовы функций разрешаются до начала выполнения основной логики.
+    \end{itemize}
+
+    \item Для программы \texttt{prog\_dynamic}:
+    \begin{itemize}
+        \item На старте загружаются библиотеки \texttt{./libgcf\_euclid.so} и \texttt{./libsquare\_rect.so} с помощью \texttt{dlopen};
+        \item Через \texttt{dlsym} получаются указатели на функции \texttt{GCF} и \texttt{Square};
+        \item При вводе команды \texttt{3} текущие библиотеки выгружаются (\texttt{dlclose}), загружаются альтернативные (\texttt{libgcf\_naive.so}, \texttt{libsquare\_triangle.so}), обновляются указатели на функции;
+        \item Результат выводится в консоль.
+    \end{itemize}
+
+    \item Все функции экспортируются с \texttt{extern "C"}, чтобы избежать name mangling и обеспечить корректную работу \texttt{dlsym}.
+
+    \item Память в библиотеках не выделяется динамически, так как обе функции возвращают простые типы (\texttt{int}, \texttt{float}), поэтому освобождение памяти не требуется.
+
+    \item Обработка ошибок:
+    \begin{itemize}
+        \item При ошибке \texttt{dlopen} или \texttt{dlsym} выводится сообщение и программа завершается с кодом \texttt{EXIT\_FAILURE};
+        \item Все ресурсы (дескрипторы библиотек) освобождаются вручную через \texttt{dlclose} при завершении.
+    \end{itemize}
+\end{enumerate}
+
+\section*{Архитектура программы}
+
+\begin{verbatim}
+lab4-var24/
+├── CMakeLists.txt
+├── include/
+│   └── functions.h
+├── src/
+│   ├── gcf_euclid.cpp
+│   ├── gcf_naive.cpp
+│   ├── square_rect.cpp
+│   └── square_triangle.cpp
+├── main_static.cpp
+└── main_dynamic.cpp
+\end{verbatim}
+
+\section*{Ссылки}
+
+\begin{itemize}
+    \item https://pubs.opengroup.org/onlinepubs/9699919799/functions/dlopen.html
+    \item https://pubs.opengroup.org/onlinepubs/9699919799/functions/dlsym.html
+    \item https://pubs.opengroup.org/onlinepubs/9699919799/functions/dlclose.html
+    \item https://man7.org/linux/man-pages/man3/dlopen.3.html
+    \item https://www.ibm.com/developerworks/library/l-dynamic-libraries/
+\end{itemize}
