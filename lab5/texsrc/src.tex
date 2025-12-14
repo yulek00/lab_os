@@ -1,0 +1,90 @@
+\section*{Сводка по исследованию программ (Strace)}
+
+\subsection*{Лабораторная работа \textnumero 1: Взаимодействие процессов через неименованный канал (Pipe)}
+
+Данный вывод \texttt{strace} демонстрирует создание неименованного канала (pipe) и его использование для однонаправленной передачи данных (имени файла и команд) между родительским и дочерним процессом.
+
+\subsubsection*{Ключевые системные вызовы}
+\begin{itemize}
+    \item \textbf{\texttt{pipe2}}: Создает неименованный канал с двумя файловыми дескрипторами: [3] для чтения и [4] для записи.
+        \begin{lstlisting}[numbers=none]
+pipe2([3, 4], 0) = 0
+        \end{lstlisting}
+    \item \textbf{\texttt{clone}}: Создает дочерний процесс (\texttt{208473}).
+    \item \textbf{\texttt{close}}: После создания канала каждый процесс закрывает ненужный ему конец: родитель закрывает чтение (\texttt{close(3)}), а дочерний закрывает запись (\texttt{close(4)}).
+    \item \textbf{\texttt{write/read}}: Родительский процесс (\texttt{208412}) записывает данные (\texttt{"t.txt\n"}, \texttt{"10 2 5 \n"}) в дескриптор записи (\texttt{4}), а дочерний процесс (\texttt{208473}) читает их из дескриптора чтения (\texttt{0} после \texttt{dup2}).
+        \begin{lstlisting}[numbers=none]
+[pid 208412] write(4, "t.txt\n", 6) = 6
+[pid 208473] read(0, "t.txt\n", 4096) = 6
+        \end{lstlisting}
+    \item \textbf{\texttt{dup2}}: Дочерний процесс перенаправляет файловый дескриптор канала (\texttt{3}) на стандартный ввод (\texttt{0}), чтобы читать данные, как из обычного stdin.
+        \begin{lstlisting}[numbers=none]
+[pid 208473] dup2(3, 0) = 0
+        \end{lstlisting}
+    \item \textbf{\texttt{execve}}: Дочерний процесс заменяет свой образ программы на \texttt{"./child"}.
+    \item \textbf{\texttt{wait4}}: Родитель ожидает завершения дочернего процесса, подтверждая синхронное взаимодействие.
+\end{itemize}
+
+\subsection*{Лабораторная работа \textnumero 2: Многопоточность (Monte-Carlo)}
+
+Данный вывод \texttt{strace} демонстрирует использование многопоточности для параллельных вычислений (расчет по методу Монте-Карло). Использование \texttt{clone3} с соответствующими флагами указывает на создание именно потоков в рамках одного процесса.
+
+\subsubsection*{Ключевые системные вызовы}
+\begin{itemize}
+    \item \textbf{\texttt{clone3} (с флагами \texttt{CLONE\_THREAD})}: Ключевой вызов для создания новых потоков. Флаги \texttt{CLONE\_VM}, \texttt{CLONE\_FS}, \texttt{CLONE\_FILES}, \texttt{CLONE\_SIGHAND} гарантируют, что потоки разделяют адресное пространство, файловые дескрипторы и обработчики сигналов, что является определением потока в Linux.
+        \begin{lstlisting}[numbers=none]
+clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, ...}) = 226684
+        \end{lstlisting}
+    \item \textbf{\texttt{mmap} (\texttt{MAP\_STACK})}: Выделение отдельного стека для каждого нового потока.
+        \begin{lstlisting}[numbers=none]
+mmap(NULL, 8392704, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0)
+mprotect(0x7f69f54df000, 8388608, PROT_READ|PROT_WRITE)
+        \end{lstlisting}
+    \item \textbf{\texttt{futex}}: Используется основным потоком (\texttt{226683}) для ожидания завершения или синхронизации с другими потоками, что является стандартным механизмом в библиотеках C++ и Pthreads.
+    \item \textbf{\texttt{exit(0)}}: Потоки завершают свою работу, не вызывая \texttt{exit\_group}, что завершило бы весь процесс.
+    \item \textbf{\texttt{madvise}}: Используется для оптимизации использования памяти, сообщая ядру, что выделенный стек потока больше не нужен (\texttt{MADV\_DONTNEED}).
+\end{itemize}
+
+\subsection*{Лабораторная работа \textnumero 3: Взаимодействие процессов через разделяемую память и сигналы}
+
+Данный вывод \texttt{strace} демонстрирует реализацию межпроцессного взаимодействия с использованием разделяемой памяти (Shared Memory) и сигналов для синхронизации.
+
+\subsubsection*{Ключевые системные вызовы}
+\begin{itemize}
+    \item \textbf{Разделяемая память}:
+    \begin{itemize}
+        \item \texttt{openat} (\texttt{/dev/shm/lab3\_shm}) и \texttt{ftruncate} создают и резервируют место для объекта разделяемой памяти.
+        \item \texttt{mmap} с флагом \texttt{MAP\_SHARED} отображает память в адресное пространство родителя и дочернего процесса (\texttt{10241}).
+    \end{itemize}
+    \item \textbf{Создание процесса}: \texttt{clone} используется для создания дочернего процесса.
+    \item \textbf{Синхронизация по сигналам}:
+    \begin{itemize}
+        \item \texttt{rt\_sigaction} устанавливает обработчики для \texttt{SIGUSR1} и \texttt{SIGUSR2}.
+        \item \texttt{kill} используется для отправки сигналов (\texttt{kill(10241, SIGUSR1)}) для уведомления о готовности данных.
+        \item \texttt{pause} используется для ожидания сигнала.
+    \end{itemize}
+    \item \textbf{Очистка ресурсов}: \texttt{munmap} освобождает отображения памяти, \texttt{wait4} ожидает завершения дочернего процесса, и \texttt{unlink("/dev/shm/lab3\_shm")} удаляет объект.
+\end{itemize}
+\lstset{
+    basicstyle=\footnotesize\ttfamily,
+    caption={Фрагмент strace для ЛР №3 (Разделяемая память и сигналы)},
+}
+
+\subsection*{Лабораторная работа \textnumero 4: Динамическая загрузка библиотек}
+
+Данный вывод \texttt{strace} иллюстрирует динамическую загрузку, выгрузку и замену функциональности с использованием разделяемых библиотек (\texttt{.so}) во время выполнения программы, используя функции, аналогичные \texttt{dlopen} и \texttt{dlclose}.
+
+\subsubsection*{Ключевые системные вызовы}
+\begin{itemize}
+    \item \textbf{Загрузка (\texttt{dlopen})}: Для загрузки каждого файла (\texttt{.so}) используются:
+    \begin{itemize}
+        \item \texttt{openat}: Открытие файла библиотеки (\texttt{./libgcf\_euclid.so}, \texttt{./libsquare\_rect.so}).
+        \item Многократный \texttt{mmap}: Проецирование сегментов кода и данных библиотеки в адресное пространство процесса.
+    \end{itemize}
+    \item \textbf{Выгрузка (\texttt{dlclose})}: При замене функционала вызывается \texttt{munmap}, которая освобождает занятую память и позволяет ядру выгрузить библиотеку.
+    \item \textbf{Повторная загрузка}: Сразу после \texttt{munmap} программа снова использует \texttt{openat} и \texttt{mmap} для загрузки нового набора библиотек (\texttt{./libgcf\_naive.so} и \texttt{./libsquare\_triangle.so}).
+\end{itemize}
+\lstset{
+    basicstyle=\footnotesize\ttfamily,
+    caption={Фрагмент strace для ЛР №4 (Динамическая загрузка)},
+}
