@@ -58,7 +58,6 @@ int main() {
 
     while (std::cin >> cmd) {
         if (cmd == 0) {
-            // Выход
             std::cout << "Exiting...\n";
             break;
         }
